@@ -1,5 +1,7 @@
 # Schedule Card
 
+Current version: `0.0.1`. Releases use SemVer and matching `vMAJOR.MINOR.PATCH` Git tags.
+
 A Lovelace card for visualizing and editing schedules stored by Home Assistant's built-in [Schedule integration](https://www.home-assistant.io/integrations/schedule/). Drag a bar to move it, drag either edge to resize it, or drag across an empty lane to create a time range. Changes are saved automatically and Home Assistant reports invalid or overlapping ranges in the card.
 
 The card manages schedules created in the integration's storage collection. YAML-defined schedules are not returned by the integration's storage API and cannot be edited by this card.
