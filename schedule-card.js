@@ -63,8 +63,7 @@ class ScheduleCard extends HTMLElement {
     this._busy = false;
     this._subscription = null;
     this._labelObserver = new ResizeObserver(() => this._fitRangeLabels());
-    this.shadowRoot.addEventListener("mousedown", (event) => this._onEditStart(event));
-    this.shadowRoot.addEventListener("touchstart", (event) => this._onEditStart(event), { passive: false });
+    this.shadowRoot.addEventListener("pointerdown", (event) => this._onEditStart(event));
     this.shadowRoot.addEventListener("click", (event) => this._handleScheduleClick(event));
     this.shadowRoot.addEventListener("keydown", (event) => this._handleScheduleKeydown(event));
     this.shadowRoot.addEventListener("change", (event) => {
@@ -303,14 +302,46 @@ class ScheduleCard extends HTMLElement {
   }
 
   _handleScheduleClick(event) {
+    if (this._suppressNextClick) {
+      this._suppressNextClick = false;
+      return;
+    }
     if (event.target.closest("select")) return;
     const legendEntry = event.target.closest("[data-edit-entity]");
     if (legendEntry) {
       this._setActiveSchedule(legendEntry.dataset.editEntity);
       return;
     }
-    const target = event.target.closest("[data-edit-target]");
-    if (target) this._setActiveSchedule(`schedule.${target.value}`);
+    if (event.target.closest("[data-edit-target]")) return;
+    const range = event.target.closest(".range[data-entity]");
+    if (range) {
+      const scheduleId = range.dataset.entity.slice("schedule.".length);
+      if (scheduleId !== this._activeScheduleId) {
+        this._setActiveSchedule(scheduleId);
+        return;
+      }
+      this._selectedRange = { id: scheduleId, day: range.dataset.day, index: Number(range.dataset.index) };
+      this._render();
+      return;
+    }
+    const track = event.target.closest(".track[data-entity]");
+    if (!track) return;
+    const scheduleId = track.dataset.entity.slice("schedule.".length);
+    if (scheduleId !== this._activeScheduleId) {
+      this._setActiveSchedule(scheduleId);
+      return;
+    }
+    const item = this._items.find((schedule) => schedule.id === scheduleId);
+    const rect = track.getBoundingClientRect();
+    if (!item || !rect.width) return;
+    const start = Math.min(1380, this._minuteAt(event.clientX, rect));
+    const day = track.dataset.day;
+    const ranges = [...(item[day] || []), {
+      from: this._timeValue(start),
+      to: this._timeValue(start + 60),
+    }].sort((first, second) => first.from.localeCompare(second.from));
+    this._selectedRange = { id: scheduleId, day, index: ranges.findIndex((range) => range.from === this._timeValue(start)) };
+    this._saveSchedule(item, day, ranges);
   }
 
   async _handleScheduleKeydown(event) {
@@ -360,8 +391,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   _onEditStart(event) {
-    const isTouch = event.type === "touchstart";
-    if (this._busy || (!isTouch && event.button !== 0)) return;
+    if (this._busy || event.button !== 0) return;
     const rangeElement = event.target.closest(".range[data-entity]");
     const track = rangeElement?.parentElement || event.target.closest(".track[data-entity]");
     if (!track) return;
@@ -401,27 +431,22 @@ class ScheduleCard extends HTMLElement {
       track,
       trackRect,
       rangeElement,
-      isTouch,
+      pointerId: event.pointerId,
       moved: false,
     };
     this._dragMove = (moveEvent) => this._onEditMove(moveEvent);
     this._dragEnd = (endEvent) => this._onEditEnd(endEvent);
     this._dragCancel = () => this._cancelEditGesture();
-    if (isTouch) {
-      window.addEventListener("touchmove", this._dragMove, { passive: false });
-      window.addEventListener("touchend", this._dragEnd);
-      window.addEventListener("touchcancel", this._dragCancel);
-    } else {
-      window.addEventListener("mousemove", this._dragMove);
-      window.addEventListener("mouseup", this._dragEnd);
-    }
+    window.addEventListener("pointermove", this._dragMove);
+    window.addEventListener("pointerup", this._dragEnd);
+    window.addEventListener("pointercancel", this._dragCancel);
     window.addEventListener("blur", this._dragCancel);
     event.preventDefault();
   }
 
   _onEditMove(event) {
     const drag = this._drag;
-    if (!drag) return;
+    if (!drag || event.pointerId !== drag.pointerId) return;
     event.preventDefault();
     const clientX = this._eventClientX(event);
     drag.lastX = clientX;
@@ -470,9 +495,11 @@ class ScheduleCard extends HTMLElement {
 
   async _onEditEnd(event) {
     const drag = this._drag;
-    if (!drag || (drag.isTouch && event.type !== "touchend") || (!drag.isTouch && event.type !== "mouseup")) return;
+    if (!drag || event.pointerId !== drag.pointerId || event.type !== "pointerup") return;
     this._removeEditListeners();
     this._drag = null;
+    this._suppressNextClick = true;
+    window.setTimeout(() => { this._suppressNextClick = false; }, 0);
 
     if (drag.action !== "create" && !drag.moved) {
       this._selectedRange = { id: drag.item.id, day: drag.day, index: drag.rangeIndex };
@@ -518,11 +545,9 @@ class ScheduleCard extends HTMLElement {
   }
 
   _removeEditListeners() {
-    window.removeEventListener("mousemove", this._dragMove);
-    window.removeEventListener("mouseup", this._dragEnd);
-    window.removeEventListener("touchmove", this._dragMove);
-    window.removeEventListener("touchend", this._dragEnd);
-    window.removeEventListener("touchcancel", this._dragCancel);
+    window.removeEventListener("pointermove", this._dragMove);
+    window.removeEventListener("pointerup", this._dragEnd);
+    window.removeEventListener("pointercancel", this._dragCancel);
     window.removeEventListener("blur", this._dragCancel);
   }
 
