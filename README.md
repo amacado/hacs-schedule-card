@@ -15,11 +15,22 @@ Alternatively, copy `schedule-card.js` into `config/www/`, then add it as a Java
 
 ## Configuration
 
-No options are required. The optional `title` changes the card heading:
+Use the Lovelace visual editor to select multiple schedule entities, set an individual color for each, choose a whole-week or single-day view, and show or hide the card header. Without an entity selection, all stored schedules are displayed.
+
+The equivalent YAML options are:
 
 ```yaml
 type: custom:schedule-card
 title: Weekly schedules
+entities:
+	- schedule.weekday
+	- schedule.weekend
+colors:
+	schedule.weekday: "#c99bf2"
+	schedule.weekend: "#5ec7b1"
+view: week # week or day
+day: today # today, monday, tuesday, wednesday, thursday, friday, saturday, sunday
+show_header: true
 ```
 
-Schedule creation, updates, and deletion use Home Assistant's `schedule/list`, `schedule/create`, `schedule/update`, `schedule/delete`, and `schedule/subscribe` websocket commands. Editing requires an administrator account. Schedule time ranges are validated by Home Assistant, including overlap checks.
+The interface follows Home Assistant's selected language, with English and German strings and locale-aware weekday names. Schedule creation, updates, and deletion use the built-in schedule websocket collection. Editing requires an administrator account, and only storage-backed schedule entities are editable. Home Assistant validates time ranges, including overlaps.
