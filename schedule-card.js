@@ -10,11 +10,6 @@ const DAYS = [
 
 const COLORS = ["#c99bf2", "#5ec7b1", "#f2a278", "#78aee8", "#e8cc63", "#e58bb6", "#9bc979"];
 
-const emptySchedule = (name = "New schedule") => ({
-  name,
-  ...Object.fromEntries(DAYS.map(([day]) => [day, []])),
-});
-
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (character) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
@@ -30,8 +25,8 @@ const minutes = (value) => {
 const formatTime = (value) => String(value ?? "").slice(0, 5);
 
 const TEXT = {
-  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", addTime: "Add time", removeTime: "Remove time", start: "Start", end: "End", actionData: "Action data (JSON)", noEntities: "No editable schedule entities found." },
-  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", addTime: "Zeit hinzufügen", removeTime: "Zeit entfernen", start: "Start", end: "Ende", actionData: "Aktionsdaten (JSON)", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
+  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", entityHeading: "Schedule entities", color: "Color", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
+  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
 };
 
 const localeFor = (hass) => (hass?.language || navigator.language || "en").split(/[-_]/)[0].toLowerCase();
@@ -60,10 +55,11 @@ class ScheduleCard extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._items = [];
+    this._registry = [];
     this._loading = false;
     this._error = "";
-    this._draft = null;
     this._busy = false;
+    this._drag = null;
     this._subscription = null;
     this._labelObserver = new ResizeObserver(() => this._fitRangeLabels());
   }
@@ -129,6 +125,11 @@ class ScheduleCard extends HTMLElement {
     this._render();
     try {
       this._items = await this._hass.callWS({ type: "schedule/list" });
+      try {
+        this._registry = await this._hass.callWS({ type: "config/entity_registry/list" });
+      } catch (_error) {
+        this._registry = [];
+      }
       this._loaded = true;
       this._subscribe();
     } catch (error) {
@@ -172,14 +173,11 @@ class ScheduleCard extends HTMLElement {
     );
     const message = this._loading
       ? `<div class="message">${escapeHtml(localize(this._hass, "loading"))}</div>`
-      : this._error
-        ? `<div class="message error">${escapeHtml(this._error)}</div>`
-        : missing
+      : missing
           ? `<div class="message">${escapeHtml(localize(this._hass, "missing"))}</div>`
           : items.length
             ? `${this._renderLegend(items)}${this._renderTimeline(items)}`
             : `<div class="message">${escapeHtml(this._config.entities?.length ? localize(this._hass, "missing") : localize(this._hass, "empty"))}</div>`;
-    const newEditor = this._draft && !this._draft.id ? this._renderEditor(this._draft) : "";
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -211,6 +209,9 @@ class ScheduleCard extends HTMLElement {
         .tracks { display: grid; gap: 3px; }
         .track { position: relative; height: 19px; border-radius: 4px; background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), var(--bubble-border-color, var(--divider-color, #36394f)) calc(25% - 1px), var(--bubble-border-color, var(--divider-color, #36394f)) 25%); }
         .range { position: absolute; top: 1px; height: 17px; min-width: 2px; overflow: hidden; padding: 1px 5px; border-radius: 4px; background: var(--schedule-color); color: var(--schedule-text-color, #241e2d); font-size: 11px; line-height: 15px; white-space: nowrap; }
+        .range { cursor: grab; touch-action: none; }
+        .range:active { cursor: grabbing; }
+        .preview { position: absolute; top: 1px; height: 17px; border: 1px dashed var(--schedule-color); border-radius: 4px; background: color-mix(in srgb, var(--schedule-color) 45%, transparent); pointer-events: none; }
         .empty { position: absolute; top: 2px; left: 4px; color: var(--secondary-text-color, #b8bed8); font-size: 10px; }
         .message { padding: 12px 0; color: var(--secondary-text-color, #b8bed8); }
         .error { color: var(--error-color, #b3261e); }
@@ -235,16 +236,17 @@ class ScheduleCard extends HTMLElement {
         }
       </style>
       <section class="card">
-        ${this._config.show_header ? `<header><h2>${title}</h2><button class="icon-button primary" data-action="new" aria-label="${escapeHtml(localize(this._hass, "add"))}" title="${escapeHtml(localize(this._hass, "add"))}"><ha-icon icon="mdi:plus"></ha-icon></button></header>` : `<div class="toolbar"><button class="icon-button primary" data-action="new" aria-label="${escapeHtml(localize(this._hass, "add"))}" title="${escapeHtml(localize(this._hass, "add"))}"><ha-icon icon="mdi:plus"></ha-icon></button></div>`}
+        ${this._config.show_header ? `<header><h2>${title}</h2></header>` : ""}
+        ${this._error ? `<div class="message error" role="alert">${escapeHtml(this._error)}</div>` : ""}
         ${message}
-        ${this._draft?.id ? this._renderEditor(this._draft) : ""}
-        ${newEditor}
       </section>`;
-    this.shadowRoot.querySelectorAll("[data-action]").forEach((button) => {
-      button.disabled = this._busy;
+    this.shadowRoot.querySelectorAll("[data-toggle-entity]").forEach((toggle) => {
+      toggle.addEventListener("change", () => this._toggleEntity(toggle.dataset.toggleEntity, toggle.checked));
     });
-    this.shadowRoot.onclick = (event) => this._onClick(event);
-    this.shadowRoot.oninput = (event) => this._onInput(event);
+    this.shadowRoot.onpointerdown = (event) => this._onPointerDown(event);
+    this.shadowRoot.onpointermove = (event) => this._onPointerMove(event);
+    this.shadowRoot.onpointerup = (event) => this._onPointerUp(event);
+    this.shadowRoot.onpointercancel = () => this._cancelDrag();
     this._fitRangeLabels();
   }
 
@@ -252,12 +254,11 @@ class ScheduleCard extends HTMLElement {
     return `<div class="legend">${items.map((item, index) => {
       const entityId = `schedule.${item.id}`;
       const color = escapeHtml(this._colorFor(item, index));
+      const registryEntry = this._registry.find((entry) => entry.entity_id === entityId);
+      const enabled = !registryEntry?.disabled_by;
       return `<div class="legend-item" style="--schedule-color:${color}">
         <span class="swatch"></span><span class="legend-name">${escapeHtml(item.name)}</span>
-        <div class="legend-actions">
-          <button data-action="${this._draft?.id === item.id ? "cancel" : "edit"}" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(localize(this._hass, this._draft?.id === item.id ? "cancel" : "edit"))}" title="${escapeHtml(localize(this._hass, this._draft?.id === item.id ? "cancel" : "edit"))}"><ha-icon icon="${this._draft?.id === item.id ? "mdi:close" : "mdi:pencil"}"></ha-icon></button>
-          <button class="danger" data-action="delete" data-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(localize(this._hass, "delete"))} ${escapeHtml(item.name)}" title="${escapeHtml(localize(this._hass, "delete"))}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
-        </div>
+        <ha-switch data-toggle-entity="${escapeHtml(entityId)}" aria-label="${escapeHtml(localize(this._hass, enabled ? "pause" : "resume"))}: ${escapeHtml(item.name)}" title="${escapeHtml(localize(this._hass, enabled ? "pause" : "resume"))}" ${enabled ? "checked" : ""}></ha-switch>
       </div>`;
     }).join("")}</div>`;
   }
@@ -269,15 +270,16 @@ class ScheduleCard extends HTMLElement {
         const tracks = items.map((item, itemIndex) => {
           const ranges = [...(item[day] || [])].sort((a, b) => a.from.localeCompare(b.from));
           const color = escapeHtml(this._colorFor(item, itemIndex));
-          const segments = ranges.map((range) => {
+          const entityId = `schedule.${item.id}`;
+          const segments = ranges.map((range, rangeIndex) => {
             const start = minutes(range.from);
             const end = minutes(range.to);
             const left = (start / 1440) * 100;
             const width = ((end - start) / 1440) * 100;
             const label = `${formatTime(range.from)}-${formatTime(range.to)}`;
-            return `<span class="range" data-label="${escapeHtml(label)}" aria-label="${escapeHtml(`${item.name}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%">${escapeHtml(label)}</span>`;
+            return `<span class="range" data-entity="${escapeHtml(entityId)}" data-day="${day}" data-index="${rangeIndex}" data-label="${escapeHtml(label)}" aria-label="${escapeHtml(`${item.name}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%">${escapeHtml(label)}</span>`;
           }).join("");
-          return `<div class="track" style="--schedule-color:${color}">${segments || `<span class="empty">${escapeHtml(localize(this._hass, "noTimes"))}</span>`}</div>`;
+          return `<div class="track" data-entity="${escapeHtml(entityId)}" data-day="${day}" style="--schedule-color:${color}">${segments}</div>`;
         }).join("");
         return `<div class="day-row"><span class="day-name">${escapeHtml(dayLabel(this._hass, dayIndex))}</span><div class="tracks">${tracks}</div></div>`;
       }).join("")}
@@ -300,124 +302,151 @@ class ScheduleCard extends HTMLElement {
     });
   }
 
-  _renderEditor(draft) {
-    return `<div class="editor">
-      <label class="field-label" for="schedule-name">${escapeHtml(localize(this._hass, "titleLabel"))}</label>
-      <input id="schedule-name" class="name-input" data-field="name" value="${escapeHtml(draft.name)}" maxlength="100">
-      ${DAYS.map(([day], dayIndex) => {
-        const label = dayLabel(this._hass, dayIndex, "long");
-        return `<div class="edit-day">
-        <div class="edit-day-name">${escapeHtml(label)}</div>
-        <div class="ranges">${(draft[day] || []).map((range, index) => `<div class="edit-range">
-          <input type="text" inputmode="numeric" aria-label="${escapeHtml(label)} ${escapeHtml(localize(this._hass, "start"))} (HH:MM)" placeholder="HH:MM" maxlength="5" data-day="${day}" data-index="${index}" data-key="from" value="${escapeHtml(formatTime(range.from))}" required>
-          <input type="text" inputmode="numeric" aria-label="${escapeHtml(label)} ${escapeHtml(localize(this._hass, "end"))} (HH:MM)" placeholder="HH:MM" maxlength="5" data-day="${day}" data-index="${index}" data-key="to" value="${escapeHtml(formatTime(range.to))}" required>
-          <input class="range-data" aria-label="${escapeHtml(label)} ${escapeHtml(localize(this._hass, "actionData"))}" placeholder="${escapeHtml(localize(this._hass, "actionData"))}" data-day="${day}" data-index="${index}" data-key="data" value="${escapeHtml(range.data ? JSON.stringify(range.data) : "")}">
-          <button class="remove icon-button" data-action="remove" data-day="${day}" data-index="${index}" aria-label="${escapeHtml(localize(this._hass, "removeTime"))}" title="${escapeHtml(localize(this._hass, "removeTime"))}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
-        </div>`).join("")}<button class="add-day icon-button" data-action="add" data-day="${day}" aria-label="${escapeHtml(localize(this._hass, "addTime"))}" title="${escapeHtml(localize(this._hass, "addTime"))}"><ha-icon icon="mdi:plus"></ha-icon></button></div>
-      </div>`;
-      }).join("")}
-      ${this._editorError ? `<div class="editor-error" role="alert">${escapeHtml(this._editorError)}</div>` : ""}
-      <div class="editor-actions"><button class="primary icon-button" data-action="save" aria-label="${escapeHtml(localize(this._hass, "save"))}" title="${escapeHtml(localize(this._hass, "save"))}"><ha-icon icon="mdi:check"></ha-icon></button><button class="icon-button" data-action="cancel" aria-label="${escapeHtml(localize(this._hass, "cancel"))}" title="${escapeHtml(localize(this._hass, "cancel"))}"><ha-icon icon="mdi:close"></ha-icon></button></div>
-    </div>`;
+  _onPointerDown(event) {
+    if (this._busy || event.button !== 0 || event.target.closest("ha-switch")) return;
+    const rangeElement = event.target.closest(".range");
+    const track = rangeElement?.parentElement || event.target.closest(".track[data-entity]");
+    if (!track) return;
+    const { entity: entityId, day } = track.dataset;
+    const item = this._items.find((schedule) => `schedule.${schedule.id}` === entityId);
+    if (!item) return;
+
+    const trackRect = track.getBoundingClientRect();
+    const minuteAtPointer = this._snapMinute(((event.clientX - trackRect.left) / trackRect.width) * 1440);
+    let action = "create";
+    let rangeIndex = -1;
+    let start = minuteAtPointer;
+    let end = minuteAtPointer;
+
+    if (rangeElement) {
+      rangeIndex = Number(rangeElement.dataset.index);
+      const range = item[day][rangeIndex];
+      start = minutes(range.from);
+      end = minutes(range.to);
+      const rect = rangeElement.getBoundingClientRect();
+      const offset = event.clientX - rect.left;
+      const edgeSize = Math.min(8, rect.width / 4);
+      action = offset < edgeSize ? "resize-start" : offset > rect.width - edgeSize ? "resize-end" : "move";
+    }
+
+    this._drag = { entityId, day, action, rangeIndex, start, end, anchor: minuteAtPointer, track, trackRect, rangeElement, pointerId: event.pointerId };
+    track.setPointerCapture(event.pointerId);
+    event.preventDefault();
   }
 
-  _onInput(event) {
-    const field = event.target.dataset.field;
-    if (field === "name" && this._draft) this._draft.name = event.target.value;
-    const { day, index, key } = event.target.dataset;
-    if (day && key && this._draft?.[day]?.[index]) {
-      this._draft[day][index][key] = event.target.value;
-    }
+  _snapMinute(value) {
+    return Math.max(0, Math.min(1440, Math.round(value / 15) * 15));
   }
 
-  async _onClick(event) {
-    const button = event.target.closest("button[data-action]");
-    if (!button || this._busy) return;
-    const { action, id, day, index } = button.dataset;
-    this._editorError = "";
+  _onPointerMove(event) {
+    const drag = this._drag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const pointer = this._snapMinute(((event.clientX - drag.trackRect.left) / drag.trackRect.width) * 1440);
+    let start = drag.start;
+    let end = drag.end;
 
-    if (action === "new") {
-      this._draft = { ...emptySchedule(), id: "" };
-    } else if (action === "edit") {
-      const item = this._items.find((schedule) => schedule.id === id);
-      if (item) this._draft = JSON.parse(JSON.stringify(item));
-    } else if (action === "cancel") {
-      this._draft = null;
-    } else if (action === "add") {
-      this._draft[day].push({ from: "09:00", to: "17:00" });
-    } else if (action === "remove") {
-      this._draft[day].splice(Number(index), 1);
-    } else if (action === "save") {
-      await this._save();
-      return;
-    } else if (action === "delete") {
-      const item = this._items.find((schedule) => schedule.id === id);
-      if (!item || !window.confirm(localize(this._hass, "confirm", { name: item.name }))) return;
-      await this._delete(id);
-      return;
+    if (drag.action === "create") {
+      start = Math.min(drag.anchor, pointer);
+      end = Math.max(drag.anchor, pointer);
+      if (end - start < 15) end = Math.min(1440, start + 15);
+    } else if (drag.action === "move") {
+      const delta = pointer - drag.anchor;
+      const duration = drag.end - drag.start;
+      start = Math.max(0, Math.min(1440 - duration, drag.start + delta));
+      end = start + duration;
+    } else if (drag.action === "resize-start") {
+      start = Math.max(0, Math.min(drag.end - 15, pointer));
+    } else if (drag.action === "resize-end") {
+      end = Math.max(drag.start + 15, Math.min(1440, pointer));
     }
-    this._render();
-  }
 
-  async _save() {
-    const name = this._draft.name.trim();
-    if (!name) {
-      this._editorError = localize(this._hass, "nameRequired");
-      this._render();
-      return;
-    }
-    const scheduleId = this._draft.id;
-    const payload = { name, ...(this._draft.icon ? { icon: this._draft.icon } : {}) };
-    try {
-      for (const [day] of DAYS) {
-        payload[day] = this._draft[day].map((range) => {
-          const normalized = { from: range.from, to: range.to };
-          if (!normalized.from || !normalized.to) throw new Error(localize(this._hass, "timeRequired"));
-          if (range.data !== undefined && range.data !== "") {
-            let data;
-            try {
-              data = typeof range.data === "string" ? JSON.parse(range.data) : range.data;
-            } catch (_error) {
-              throw new Error(localize(this._hass, "jsonInvalid"));
-            }
-            if (!data || Array.isArray(data) || typeof data !== "object") {
-              throw new Error(localize(this._hass, "jsonObject"));
-            }
-            normalized.data = data;
-          }
-          return normalized;
-        });
+    drag.preview = { start, end };
+    if (drag.rangeElement) {
+      drag.rangeElement.style.left = `${(start / 1440) * 100}%`;
+      drag.rangeElement.style.width = `${((end - start) / 1440) * 100}%`;
+    } else {
+      if (!drag.previewElement) {
+        drag.previewElement = document.createElement("span");
+        drag.previewElement.className = "preview";
+        drag.track.append(drag.previewElement);
       }
-      this._busy = true;
-      this._render();
-      const result = scheduleId
-        ? await this._hass.callWS({ type: "schedule/update", schedule_id: scheduleId, ...payload })
-        : await this._hass.callWS({ type: "schedule/create", ...payload });
-      const saved = result?.id ? result : { ...payload, id: scheduleId };
-      const existing = this._items.findIndex((schedule) => schedule.id === saved.id);
-      if (existing === -1) this._items.push(saved);
-      else this._items[existing] = saved;
-      this._draft = null;
+      drag.previewElement.style.left = `${(start / 1440) * 100}%`;
+      drag.previewElement.style.width = `${((end - start) / 1440) * 100}%`;
+    }
+  }
+
+  async _onPointerUp(event) {
+    const drag = this._drag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    this._drag = null;
+    const item = this._items.find((schedule) => `schedule.${schedule.id}` === drag.entityId);
+    if (!item) return this._render();
+
+    let start = drag.preview?.start ?? drag.start;
+    let end = drag.preview?.end ?? drag.end;
+    if (drag.action === "create" && end - start < 15) {
+      start = Math.min(1380, start);
+      end = Math.min(1440, start + 60);
+    }
+    const ranges = [...(item[drag.day] || [])].map((range) => ({ ...range }));
+    const timeRange = { from: this._timeValue(start), to: this._timeValue(end) };
+    if (drag.action === "create") ranges.push(timeRange);
+    else ranges[drag.rangeIndex] = { ...ranges[drag.rangeIndex], ...timeRange };
+    ranges.sort((first, second) => first.from.localeCompare(second.from));
+    await this._saveRange(item, drag.day, ranges);
+  }
+
+  _timeValue(value) {
+    if (value >= 1440) return "24:00:00";
+    const hours = Math.floor(value / 60).toString().padStart(2, "0");
+    const minutesValue = (value % 60).toString().padStart(2, "0");
+    return `${hours}:${minutesValue}:00`;
+  }
+
+  _cancelDrag() {
+    if (!this._drag) return;
+    this._drag = null;
+    this._render();
+  }
+
+  async _saveRange(item, day, ranges) {
+    const payload = { name: item.name, ...(item.icon ? { icon: item.icon } : {}) };
+    for (const [weekday] of DAYS) {
+      payload[weekday] = weekday === day ? ranges : (item[weekday] || []).map((range) => ({ ...range }));
+    }
+    this._busy = true;
+    this._error = "";
+    this._render();
+    try {
+      const saved = await this._hass.callWS({
+        type: "schedule/update",
+        schedule_id: item.id,
+        ...payload,
+      });
+      const index = this._items.findIndex((schedule) => schedule.id === item.id);
+      if (index !== -1) this._items[index] = saved;
     } catch (error) {
-      this._editorError = error.message || localize(this._hass, "saveError");
+      this._error = error.message || localize(this._hass, "saveError");
     } finally {
       this._busy = false;
       this._render();
     }
   }
 
-  async _delete(id) {
-    this._busy = true;
-    this._render();
+  async _toggleEntity(entityId, enabled) {
+    this._error = "";
     try {
-      await this._hass.callWS({ type: "schedule/delete", schedule_id: id });
-      this._items = this._items.filter((item) => item.id !== id);
-      if (this._draft?.id === id) this._draft = null;
-      this._error = "";
+      const result = await this._hass.callWS({
+        type: "config/entity_registry/update",
+        entity_id: entityId,
+        disabled_by: enabled ? null : "user",
+      });
+      const index = this._registry.findIndex((entry) => entry.entity_id === entityId);
+      if (index !== -1) this._registry[index] = result.entity_entry;
+      if (result.require_restart) this._error = localize(this._hass, "restartRequired");
+      this._render();
     } catch (error) {
-      this._error = error.message || localize(this._hass, "deleteError");
-    } finally {
-      this._busy = false;
+      this._error = error.message || localize(this._hass, "toggleError");
       this._render();
     }
   }
@@ -468,16 +497,11 @@ class ScheduleCardEditor extends HTMLElement {
     const selected = this._config.entities || [];
     const entities = this._entities();
     const locale = this._hass;
-    const entityRows = entities.map((state) => {
-      const entityId = state.entity_id;
-      const name = state.attributes.friendly_name || entityId;
-      const checked = selected.includes(entityId);
-      const colorIndex = Math.max(0, selected.indexOf(entityId));
-      const color = this._config.colors?.[entityId] || COLORS[colorIndex % COLORS.length];
-      return `<div class="entity-row">
-        <label class="entity-name"><input type="checkbox" data-entity="${escapeHtml(entityId)}" ${checked ? "checked" : ""}><span class="swatch" style="--schedule-color:${escapeHtml(color)}"></span><span>${escapeHtml(name)}</span></label>
-        ${checked ? `<input class="color" type="color" data-color-entity="${escapeHtml(entityId)}" value="${escapeHtml(color)}" aria-label="${escapeHtml(name)} color" title="${escapeHtml(name)} color">` : ""}
-      </div>`;
+    const availableEntities = [...new Set([...entities.map((state) => state.entity_id), ...selected])];
+    const selectedColors = selected.map((entityId, index) => {
+      const name = this._hass?.states?.[entityId]?.attributes?.friendly_name || entityId;
+      const color = this._config.colors?.[entityId] || COLORS[index % COLORS.length];
+      return `<label class="color-row"><span>${escapeHtml(name)}</span><input class="color" type="color" data-color-entity="${escapeHtml(entityId)}" value="${escapeHtml(color)}" aria-label="${escapeHtml(localize(locale, "color"))}: ${escapeHtml(name)}" title="${escapeHtml(localize(locale, "color"))}: ${escapeHtml(name)}"></label>`;
     }).join("");
     const dayOptions = [`<option value="today" ${this._config.day === "today" ? "selected" : ""}>${escapeHtml(localize(locale, "today"))}</option>`, ...DAYS.map(([day], index) => `<option value="${day}" ${this._config.day === day ? "selected" : ""}>${escapeHtml(dayLabel(locale, index, "long"))}</option>`)].join("");
 
@@ -488,33 +512,34 @@ class ScheduleCardEditor extends HTMLElement {
         .field { display: grid; gap: 6px; }
         .label { font-size: 13px; font-weight: 600; }
         input[type="text"], select { min-height: 40px; padding: 7px 10px; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--card-background-color); color: inherit; font: inherit; }
-        .entities { display: grid; gap: 2px; max-height: 240px; overflow: auto; padding: 5px 0; }
-        .entity-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 4px 8px; border-radius: 8px; }
-        .entity-row:hover { background: var(--secondary-background-color); }
-        .entity-name { display: flex; align-items: center; gap: 9px; min-width: 0; font-size: 14px; }
-        .entity-name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary-color); }
-        .swatch { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--schedule-color); }
+        .entity-picker { display: block; }
+        .color-list { display: grid; gap: 6px; }
+        .color-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+        .color-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .color { width: 38px; height: 32px; padding: 2px; border: 1px solid var(--divider-color); border-radius: 7px; background: transparent; }
-        .hint { color: var(--secondary-text-color); font-size: 12px; }
         .toggle { display: flex; align-items: center; gap: 9px; font-size: 14px; }
+        .hint { color: var(--secondary-text-color); font-size: 12px; }
       </style>
       <div class="editor">
         <div class="field"><span class="label">${escapeHtml(localize(locale, "entityHeading"))}</span>
-          <div class="entities">${entityRows || `<span class="hint">${escapeHtml(localize(locale, "noEntities"))}</span>`}</div>
+          <div class="entity-picker"></div>
         </div>
+        ${selected.length ? `<div class="field"><span class="label">${escapeHtml(localize(locale, "color"))}</span><div class="color-list">${selectedColors}</div></div>` : ""}
         <label class="field"><span class="label">${escapeHtml(localize(locale, "titleLabel"))}</span><input type="text" data-option="title" value="${escapeHtml(this._config.title || "")}"></label>
         <label class="field"><span class="label">${escapeHtml(localize(locale, "view"))}</span><select data-option="view"><option value="week" ${this._config.view === "week" ? "selected" : ""}>${escapeHtml(localize(locale, "week"))}</option><option value="day" ${this._config.view === "day" ? "selected" : ""}>${escapeHtml(localize(locale, "day"))}</option></select></label>
         ${this._config.view === "day" ? `<label class="field"><span class="label">${escapeHtml(localize(locale, "whichDay"))}</span><select data-option="day">${dayOptions}</select></label>` : ""}
-        <label class="toggle"><input type="checkbox" data-option="show_header" ${this._config.show_header ? "checked" : ""}>${escapeHtml(localize(locale, "showHeader"))}</label>
+        <label class="toggle"><ha-switch data-option="show_header" ${this._config.show_header ? "checked" : ""}></ha-switch>${escapeHtml(localize(locale, "showHeader"))}</label>
       </div>`;
 
-    this.shadowRoot.querySelectorAll("[data-entity]").forEach((checkbox) => {
-      checkbox.addEventListener("change", () => {
-        const nextEntities = [...this.shadowRoot.querySelectorAll("[data-entity]:checked")].map((element) => element.dataset.entity);
-        this._updateConfig({ entities: nextEntities });
-      });
+    const selector = document.createElement("ha-selector");
+    selector.hass = this._hass;
+    selector.selector = { entity: { multiple: true, include_entities: availableEntities } };
+    selector.value = selected;
+    selector.required = false;
+    selector.addEventListener("value-changed", (event) => {
+      this._updateConfig({ entities: Array.isArray(event.detail.value) ? event.detail.value : [] });
     });
+    this.shadowRoot.querySelector(".entity-picker").append(selector);
     this.shadowRoot.querySelectorAll("[data-color-entity]").forEach((input) => {
       input.addEventListener("change", () => {
         const colors = { ...this._config.colors, [input.dataset.colorEntity]: input.value };
@@ -523,7 +548,7 @@ class ScheduleCardEditor extends HTMLElement {
     });
     this.shadowRoot.querySelectorAll("[data-option]").forEach((input) => {
       input.addEventListener("change", () => {
-        const value = input.type === "checkbox" ? input.checked : input.value;
+        const value = input.tagName === "HA-SWITCH" ? input.checked : input.value;
         this._updateConfig({ [input.dataset.option]: value });
       });
     });
