@@ -194,7 +194,7 @@ class ScheduleCard extends HTMLElement {
       : missing
           ? `<div class="message">${escapeHtml(localize(this._hass, "missing"))}</div>`
           : items.length
-            ? `${this._config.edit_enabled && items.length > 1 ? this._renderEditTarget(items) : ""}${this._renderSelectedRangeTools()}${this._renderTimeline(items)}${this._config.show_legend ? this._renderLegend(items) : ""}`
+            ? `${this._config.edit_enabled && items.length > 1 ? this._renderEditTarget(items) : ""}${this._renderTimeline(items)}${this._config.show_legend ? this._renderLegend(items) : ""}`
             : `<div class="message">${escapeHtml(this._config.entities?.length ? localize(this._hass, "missing") : localize(this._hass, "empty"))}</div>`;
 
     this.shadowRoot.innerHTML = `
@@ -210,9 +210,6 @@ class ScheduleCard extends HTMLElement {
         .legend-item:focus-visible { outline: 2px solid var(--primary-color, #c99bf2); outline-offset: 3px; }
         .edit-target { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 0 0 10px; font-size: 12px; }
         .edit-target select { max-width: 240px; min-height: 34px; padding: 4px 8px; border: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); border-radius: 7px; background: var(--card-background-color, #252739); color: inherit; font: inherit; }
-        .selection-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 36px; margin: 0 0 8px; color: var(--secondary-text-color, #b8bed8); font-size: 12px; }
-        .selection-tools ha-icon-button { --mdc-icon-button-size: 34px; color: var(--error-color, #ef7888); }
-        .selection-tools ha-icon { --mdc-icon-size: 20px; }
         .swatch { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--schedule-color); }
         .legend-name { overflow: hidden; max-width: 180px; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
         .timeline { min-width: 420px; }
@@ -232,6 +229,8 @@ class ScheduleCard extends HTMLElement {
         .resize-handle.end { right: 0; }
         .resize-handle::after { position: absolute; top: 3px; bottom: 3px; left: 4px; width: 2px; border-radius: 2px; background: transparent; content: ""; }
         .range:hover .resize-handle::after, .range.selected .resize-handle::after { background: rgb(36 30 45 / 70%); }
+        .range-remove { position: absolute; top: -2px; z-index: 4; display: block; width: 24px; height: 24px; padding: 0; transform: translateX(-50%); --mdc-icon-button-size: 24px; border: 1px solid var(--bubble-border-color, #36394f); border-radius: 50%; background: var(--card-background-color, #252739); color: var(--error-color, #ef7888); cursor: pointer; }
+        .range-remove ha-icon { --mdc-icon-size: 16px; }
         .preview { z-index: 3; border: 1px dashed var(--schedule-color); background: color-mix(in srgb, var(--schedule-color) 55%, transparent); pointer-events: none; }
         .track.inactive { opacity: .58; }
         .track.active { opacity: 1; }
@@ -266,20 +265,6 @@ class ScheduleCard extends HTMLElement {
     return `<label class="edit-target"><span>${escapeHtml(localize(this._hass, "editingSchedule"))}</span><select data-edit-target>${items.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === this._activeScheduleId ? "selected" : ""}>${escapeHtml(this._labelFor(item))}</option>`).join("")}</select></label>`;
   }
 
-  _renderSelectedRangeTools() {
-    const selected = this._selectedRange;
-    if (!this._config.edit_enabled || !selected) return "";
-    const item = this._items.find((schedule) => schedule.id === selected.id);
-    const dayIndex = DAYS.findIndex(([day]) => day === selected.day);
-    if (!item || dayIndex < 0) return "";
-    const ranges = [...(item[selected.day] || [])].sort((first, second) => first.from.localeCompare(second.from));
-    const range = ranges[selected.index];
-    if (!range) return "";
-    const description = `${this._labelFor(item)}, ${dayLabel(this._hass, dayIndex)}, ${formatTime(range.from)}-${formatTime(range.to)}`;
-    const removeLabel = localize(this._hass, "removeRange");
-    return `<div class="selection-tools"><span>${escapeHtml(description)}</span><ha-icon-button data-remove-range aria-label="${escapeHtml(removeLabel)}: ${escapeHtml(description)}" title="${escapeHtml(removeLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></ha-icon-button></div>`;
-  }
-
   _renderTimeline(items) {
     return `<div class="scroll"><div class="timeline">
       <div class="axis"><span></span><div class="hours"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div></div>
@@ -296,7 +281,11 @@ class ScheduleCard extends HTMLElement {
             const width = ((end - start) / 1440) * 100;
             const label = `${formatTime(range.from)}-${formatTime(range.to)}`;
             const selected = this._selectedRange?.id === item.id && this._selectedRange.day === day && this._selectedRange.index === rangeIndex;
-            return `<span class="range ${selected ? "selected" : ""}" data-entity="${escapeHtml(entityId)}" data-day="${day}" data-index="${rangeIndex}" data-label="${escapeHtml(label)}" role="button" tabindex="0" aria-label="${escapeHtml(`${entityLabel}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%"><span class="resize-handle start" data-edge="start"></span><span class="range-label">${escapeHtml(label)}</span><span class="resize-handle end" data-edge="end"></span></span>`;
+            const removeLabel = localize(this._hass, "removeRange");
+            const removeButton = selected && this._config.edit_enabled
+              ? `<ha-icon-button class="range-remove" data-remove-range style="left:${left + width}%" aria-label="${escapeHtml(removeLabel)}: ${escapeHtml(entityLabel)}, ${escapeHtml(label)}" title="${escapeHtml(removeLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></ha-icon-button>`
+              : "";
+            return `<span class="range ${selected ? "selected" : ""}" data-entity="${escapeHtml(entityId)}" data-day="${day}" data-index="${rangeIndex}" data-label="${escapeHtml(label)}" role="button" tabindex="0" aria-label="${escapeHtml(`${entityLabel}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%"><span class="resize-handle start" data-edge="start"></span><span class="range-label">${escapeHtml(label)}</span><span class="resize-handle end" data-edge="end"></span></span>${removeButton}`;
           }).join("");
           const active = item.id === this._activeScheduleId;
           return `<div class="track ${active ? "active" : "inactive"}" data-entity="${escapeHtml(entityId)}" data-day="${day}" style="--schedule-color:${color}" role="button" tabindex="0" aria-label="${escapeHtml(localize(this._hass, "selectSchedule", { name: entityLabel }))}" title="${escapeHtml(localize(this._hass, "selectSchedule", { name: entityLabel }))}">${segments}</div>`;
@@ -418,7 +407,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   _onEditStart(event) {
-    if (!this._config.edit_enabled || this._busy || event.button !== 0) return;
+    if (!this._config.edit_enabled || this._busy || event.button !== 0 || event.target.closest("[data-remove-range]")) return;
     const rangeElement = event.target.closest(".range[data-entity]");
     const track = rangeElement?.parentElement || event.target.closest(".track[data-entity]");
     if (!track) return;
