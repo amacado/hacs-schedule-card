@@ -63,6 +63,15 @@ class ScheduleCard extends HTMLElement {
     this._busy = false;
     this._subscription = null;
     this._labelObserver = new ResizeObserver(() => this._fitRangeLabels());
+    this.shadowRoot.addEventListener("mousedown", (event) => this._onEditStart(event));
+    this.shadowRoot.addEventListener("touchstart", (event) => this._onEditStart(event), { passive: false });
+    this.shadowRoot.addEventListener("click", (event) => this._handleScheduleClick(event));
+    this.shadowRoot.addEventListener("keydown", (event) => this._handleScheduleKeydown(event));
+    this.shadowRoot.addEventListener("change", (event) => {
+      if (event.target.matches("[data-edit-target]")) {
+        this._setActiveSchedule(event.target.value);
+      }
+    });
   }
 
   connectedCallback() {
@@ -232,15 +241,6 @@ class ScheduleCard extends HTMLElement {
         ${this._error ? `<div class="message error" role="alert">${escapeHtml(this._error)}</div>` : ""}
         ${message}
       </section>`;
-    this.shadowRoot.onmousedown = (event) => this._onEditStart(event);
-    this.shadowRoot.ontouchstart = (event) => this._onEditStart(event);
-    this.shadowRoot.onclick = (event) => this._handleScheduleClick(event);
-    this.shadowRoot.onkeydown = (event) => this._handleScheduleKeydown(event);
-    this.shadowRoot.onchange = (event) => {
-      if (event.target.matches("[data-edit-target]")) {
-        this._setActiveSchedule(event.target.value);
-      }
-    };
     this._fitRangeLabels();
   }
 
