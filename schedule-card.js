@@ -25,8 +25,8 @@ const minutes = (value) => {
 const formatTime = (value) => String(value ?? "").slice(0, 5);
 
 const TEXT = {
-  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", entityHeading: "Schedule entities", color: "Color", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
-  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
+  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", showLegend: "Show legend", entityHeading: "Schedule entities", color: "Color", label: "Label", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
+  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", showLegend: "Legende anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
 };
 
 const localeFor = (hass) => (hass?.language || navigator.language || "en").split(/[-_]/)[0].toLowerCase();
@@ -48,20 +48,22 @@ class ScheduleCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], view: "week", day: "today", show_header: true };
+    return { entities: [], view: "week", day: "today", show_header: true, show_legend: true };
   }
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
     this._items = [];
-    this._registry = [];
     this._loading = false;
     this._error = "";
     this._busy = false;
     this._drag = null;
     this._subscription = null;
     this._labelObserver = new ResizeObserver(() => this._fitRangeLabels());
+    this._boundPointerMove = (event) => this._onPointerMove(event);
+    this._boundPointerUp = (event) => this._onPointerUp(event);
+    this._boundPointerCancel = () => this._cancelDrag();
   }
 
   connectedCallback() {
@@ -78,6 +80,7 @@ class ScheduleCard extends HTMLElement {
       view: "week",
       day: "today",
       show_header: true,
+      show_legend: true,
       ...config,
       entities: config.entities || (config.entity ? [config.entity] : []),
     };
@@ -118,6 +121,11 @@ class ScheduleCard extends HTMLElement {
       : COLORS[index % COLORS.length];
   }
 
+  _labelFor(item) {
+    const entityId = `schedule.${item.id}`;
+    return this._config.labels?.[entityId]?.trim() || item.name;
+  }
+
   async _load() {
     if (!this._hass) return;
     this._loading = true;
@@ -125,11 +133,6 @@ class ScheduleCard extends HTMLElement {
     this._render();
     try {
       this._items = await this._hass.callWS({ type: "schedule/list" });
-      try {
-        this._registry = await this._hass.callWS({ type: "config/entity_registry/list" });
-      } catch (_error) {
-        this._registry = [];
-      }
       this._loaded = true;
       this._subscribe();
     } catch (error) {
@@ -176,7 +179,7 @@ class ScheduleCard extends HTMLElement {
       : missing
           ? `<div class="message">${escapeHtml(localize(this._hass, "missing"))}</div>`
           : items.length
-            ? `${this._renderLegend(items)}${this._renderTimeline(items)}`
+            ? `${this._renderTimeline(items)}${this._config.show_legend ? this._renderLegend(items) : ""}`
             : `<div class="message">${escapeHtml(this._config.entities?.length ? localize(this._hass, "missing") : localize(this._hass, "empty"))}</div>`;
 
     this.shadowRoot.innerHTML = `
@@ -240,13 +243,7 @@ class ScheduleCard extends HTMLElement {
         ${this._error ? `<div class="message error" role="alert">${escapeHtml(this._error)}</div>` : ""}
         ${message}
       </section>`;
-    this.shadowRoot.querySelectorAll("[data-toggle-entity]").forEach((toggle) => {
-      toggle.addEventListener("change", () => this._toggleEntity(toggle.dataset.toggleEntity, toggle.checked));
-    });
     this.shadowRoot.onpointerdown = (event) => this._onPointerDown(event);
-    this.shadowRoot.onpointermove = (event) => this._onPointerMove(event);
-    this.shadowRoot.onpointerup = (event) => this._onPointerUp(event);
-    this.shadowRoot.onpointercancel = () => this._cancelDrag();
     this._fitRangeLabels();
   }
 
@@ -254,11 +251,9 @@ class ScheduleCard extends HTMLElement {
     return `<div class="legend">${items.map((item, index) => {
       const entityId = `schedule.${item.id}`;
       const color = escapeHtml(this._colorFor(item, index));
-      const registryEntry = this._registry.find((entry) => entry.entity_id === entityId);
-      const enabled = !registryEntry?.disabled_by;
+      const label = this._labelFor(item);
       return `<div class="legend-item" style="--schedule-color:${color}">
-        <span class="swatch"></span><span class="legend-name">${escapeHtml(item.name)}</span>
-        <ha-switch data-toggle-entity="${escapeHtml(entityId)}" aria-label="${escapeHtml(localize(this._hass, enabled ? "pause" : "resume"))}: ${escapeHtml(item.name)}" title="${escapeHtml(localize(this._hass, enabled ? "pause" : "resume"))}" ${enabled ? "checked" : ""}></ha-switch>
+        <span class="swatch"></span><span class="legend-name">${escapeHtml(label)}</span>
       </div>`;
     }).join("")}</div>`;
   }
@@ -271,13 +266,14 @@ class ScheduleCard extends HTMLElement {
           const ranges = [...(item[day] || [])].sort((a, b) => a.from.localeCompare(b.from));
           const color = escapeHtml(this._colorFor(item, itemIndex));
           const entityId = `schedule.${item.id}`;
+          const entityLabel = this._labelFor(item);
           const segments = ranges.map((range, rangeIndex) => {
             const start = minutes(range.from);
             const end = minutes(range.to);
             const left = (start / 1440) * 100;
             const width = ((end - start) / 1440) * 100;
             const label = `${formatTime(range.from)}-${formatTime(range.to)}`;
-            return `<span class="range" data-entity="${escapeHtml(entityId)}" data-day="${day}" data-index="${rangeIndex}" data-label="${escapeHtml(label)}" aria-label="${escapeHtml(`${item.name}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%">${escapeHtml(label)}</span>`;
+            return `<span class="range" data-entity="${escapeHtml(entityId)}" data-day="${day}" data-index="${rangeIndex}" data-label="${escapeHtml(label)}" aria-label="${escapeHtml(`${entityLabel}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%">${escapeHtml(label)}</span>`;
           }).join("");
           return `<div class="track" data-entity="${escapeHtml(entityId)}" data-day="${day}" style="--schedule-color:${color}">${segments}</div>`;
         }).join("");
@@ -303,7 +299,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   _onPointerDown(event) {
-    if (this._busy || event.button !== 0 || event.target.closest("ha-switch")) return;
+    if (this._busy || (event.pointerType !== "touch" && event.button !== 0)) return;
     const rangeElement = event.target.closest(".range");
     const track = rangeElement?.parentElement || event.target.closest(".track[data-entity]");
     if (!track) return;
@@ -312,6 +308,7 @@ class ScheduleCard extends HTMLElement {
     if (!item) return;
 
     const trackRect = track.getBoundingClientRect();
+    if (!trackRect.width) return;
     const minuteAtPointer = this._snapMinute(((event.clientX - trackRect.left) / trackRect.width) * 1440);
     let action = "create";
     let rangeIndex = -1;
@@ -329,8 +326,10 @@ class ScheduleCard extends HTMLElement {
       action = offset < edgeSize ? "resize-start" : offset > rect.width - edgeSize ? "resize-end" : "move";
     }
 
-    this._drag = { entityId, day, action, rangeIndex, start, end, anchor: minuteAtPointer, track, trackRect, rangeElement, pointerId: event.pointerId };
-    track.setPointerCapture(event.pointerId);
+    this._drag = { entityId, day, action, rangeIndex, start, end, anchor: minuteAtPointer, track, trackRect, rangeElement, pointerId: event.pointerId, moved: false };
+    window.addEventListener("pointermove", this._boundPointerMove, true);
+    window.addEventListener("pointerup", this._boundPointerUp, true);
+    window.addEventListener("pointercancel", this._boundPointerCancel, true);
     event.preventDefault();
   }
 
@@ -342,6 +341,8 @@ class ScheduleCard extends HTMLElement {
     const drag = this._drag;
     if (!drag || event.pointerId !== drag.pointerId) return;
     const pointer = this._snapMinute(((event.clientX - drag.trackRect.left) / drag.trackRect.width) * 1440);
+    drag.moved ||= Math.abs(pointer - drag.anchor) >= 3;
+    if (!drag.moved) return;
     let start = drag.start;
     let end = drag.end;
 
@@ -379,6 +380,8 @@ class ScheduleCard extends HTMLElement {
     const drag = this._drag;
     if (!drag || event.pointerId !== drag.pointerId) return;
     this._drag = null;
+    this._removePointerListeners();
+    if (!drag.moved) return;
     const item = this._items.find((schedule) => `schedule.${schedule.id}` === drag.entityId);
     if (!item) return this._render();
 
@@ -406,7 +409,14 @@ class ScheduleCard extends HTMLElement {
   _cancelDrag() {
     if (!this._drag) return;
     this._drag = null;
+    this._removePointerListeners();
     this._render();
+  }
+
+  _removePointerListeners() {
+    window.removeEventListener("pointermove", this._boundPointerMove, true);
+    window.removeEventListener("pointerup", this._boundPointerUp, true);
+    window.removeEventListener("pointercancel", this._boundPointerCancel, true);
   }
 
   async _saveRange(item, day, ranges) {
@@ -433,23 +443,6 @@ class ScheduleCard extends HTMLElement {
     }
   }
 
-  async _toggleEntity(entityId, enabled) {
-    this._error = "";
-    try {
-      const result = await this._hass.callWS({
-        type: "config/entity_registry/update",
-        entity_id: entityId,
-        disabled_by: enabled ? null : "user",
-      });
-      const index = this._registry.findIndex((entry) => entry.entity_id === entityId);
-      if (index !== -1) this._registry[index] = result.entity_entry;
-      if (result.require_restart) this._error = localize(this._hass, "restartRequired");
-      this._render();
-    } catch (error) {
-      this._error = error.message || localize(this._hass, "toggleError");
-      this._render();
-    }
-  }
 }
 
 class ScheduleCardEditor extends HTMLElement {
@@ -463,6 +456,7 @@ class ScheduleCardEditor extends HTMLElement {
       view: "week",
       day: "today",
       show_header: true,
+      show_legend: true,
       ...config,
       entities: config.entities || (config.entity ? [config.entity] : []),
     };
@@ -498,10 +492,14 @@ class ScheduleCardEditor extends HTMLElement {
     const entities = this._entities();
     const locale = this._hass;
     const availableEntities = [...new Set([...entities.map((state) => state.entity_id), ...selected])];
-    const selectedColors = selected.map((entityId, index) => {
+    const selectedSettings = selected.map((entityId, index) => {
       const name = this._hass?.states?.[entityId]?.attributes?.friendly_name || entityId;
       const color = this._config.colors?.[entityId] || COLORS[index % COLORS.length];
-      return `<label class="color-row"><span>${escapeHtml(name)}</span><input class="color" type="color" data-color-entity="${escapeHtml(entityId)}" value="${escapeHtml(color)}" aria-label="${escapeHtml(localize(locale, "color"))}: ${escapeHtml(name)}" title="${escapeHtml(localize(locale, "color"))}: ${escapeHtml(name)}"></label>`;
+      const label = this._config.labels?.[entityId] || "";
+      return `<div class="entity-settings">
+        <label class="field"><span>${escapeHtml(localize(locale, "label"))}: ${escapeHtml(name)}</span><input type="text" data-label-entity="${escapeHtml(entityId)}" value="${escapeHtml(label)}" placeholder="${escapeHtml(name)}"></label>
+        <label class="color-row"><span>${escapeHtml(localize(locale, "color"))}</span><input class="color" type="color" data-color-entity="${escapeHtml(entityId)}" value="${escapeHtml(color)}" aria-label="${escapeHtml(localize(locale, "color"))}: ${escapeHtml(name)}" title="${escapeHtml(localize(locale, "color"))}: ${escapeHtml(name)}"></label>
+      </div>`;
     }).join("");
     const dayOptions = [`<option value="today" ${this._config.day === "today" ? "selected" : ""}>${escapeHtml(localize(locale, "today"))}</option>`, ...DAYS.map(([day], index) => `<option value="${day}" ${this._config.day === day ? "selected" : ""}>${escapeHtml(dayLabel(locale, index, "long"))}</option>`)].join("");
 
@@ -513,7 +511,10 @@ class ScheduleCardEditor extends HTMLElement {
         .label { font-size: 13px; font-weight: 600; }
         input[type="text"], select { min-height: 40px; padding: 7px 10px; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--card-background-color); color: inherit; font: inherit; }
         .entity-picker { display: block; }
-        .color-list { display: grid; gap: 6px; }
+        .color-list { display: grid; gap: 12px; }
+        .entity-settings { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+        .entity-settings .field { gap: 4px; color: var(--secondary-text-color); font-size: 12px; }
+        .entity-settings .field input { color: var(--primary-text-color); font-size: 14px; }
         .color-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
         .color-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .color { width: 38px; height: 32px; padding: 2px; border: 1px solid var(--divider-color); border-radius: 7px; background: transparent; }
@@ -524,11 +525,12 @@ class ScheduleCardEditor extends HTMLElement {
         <div class="field"><span class="label">${escapeHtml(localize(locale, "entityHeading"))}</span>
           <div class="entity-picker"></div>
         </div>
-        ${selected.length ? `<div class="field"><span class="label">${escapeHtml(localize(locale, "color"))}</span><div class="color-list">${selectedColors}</div></div>` : ""}
+        ${selected.length ? `<div class="field"><span class="label">${escapeHtml(localize(locale, "entityHeading"))}</span><div class="color-list">${selectedSettings}</div></div>` : ""}
         <label class="field"><span class="label">${escapeHtml(localize(locale, "titleLabel"))}</span><input type="text" data-option="title" value="${escapeHtml(this._config.title || "")}"></label>
         <label class="field"><span class="label">${escapeHtml(localize(locale, "view"))}</span><select data-option="view"><option value="week" ${this._config.view === "week" ? "selected" : ""}>${escapeHtml(localize(locale, "week"))}</option><option value="day" ${this._config.view === "day" ? "selected" : ""}>${escapeHtml(localize(locale, "day"))}</option></select></label>
         ${this._config.view === "day" ? `<label class="field"><span class="label">${escapeHtml(localize(locale, "whichDay"))}</span><select data-option="day">${dayOptions}</select></label>` : ""}
         <label class="toggle"><ha-switch data-option="show_header" ${this._config.show_header ? "checked" : ""}></ha-switch>${escapeHtml(localize(locale, "showHeader"))}</label>
+        <label class="toggle"><ha-switch data-option="show_legend" ${this._config.show_legend ? "checked" : ""}></ha-switch>${escapeHtml(localize(locale, "showLegend"))}</label>
       </div>`;
 
     const selector = document.createElement("ha-selector");
@@ -544,6 +546,12 @@ class ScheduleCardEditor extends HTMLElement {
       input.addEventListener("change", () => {
         const colors = { ...this._config.colors, [input.dataset.colorEntity]: input.value };
         this._updateConfig({ colors });
+      });
+    });
+    this.shadowRoot.querySelectorAll("[data-label-entity]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const labels = { ...this._config.labels, [input.dataset.labelEntity]: input.value.trim() };
+        this._updateConfig({ labels });
       });
     });
     this.shadowRoot.querySelectorAll("[data-option]").forEach((input) => {
