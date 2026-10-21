@@ -15,7 +15,7 @@ Alternatively, copy `schedule-card.js` into `config/www/`, then add it as a Java
 
 ## Configuration
 
-Use the Lovelace visual editor's multi-select entity dropdown to choose schedules and set a label and color for each schedule. Labels are display-only; an empty label uses the schedule's Home Assistant name. Choose a whole-week or single-day view, and show or hide the header and legend. Without an entity selection, all stored schedules are displayed. The chart has no add, edit, or delete buttons: drag across an empty schedule lane to create a time, drag a bar to move it, or drag a bar edge to resize it. Every change saves automatically.
+Use the Lovelace visual editor's multi-select entity dropdown to choose schedules and set a label and color for each schedule. Labels are display-only; an empty label uses the schedule's Home Assistant name. Choose a whole-week or single-day view, and show or hide the header and legend. Without an entity selection, all stored schedules are displayed. Click a schedule's timeline lane or legend entry to open Home Assistant's native settings mask for that specific schedule. When several schedules are shown, each lane and legend entry opens its own schedule.
 
 The equivalent YAML options are:
 
@@ -35,4 +35,4 @@ show_header: true
 show_legend: true
 ```
 
-The interface follows Home Assistant's selected language, with English and German strings and locale-aware weekday names. Editing requires an administrator account. Only storage-backed schedules can be edited; YAML-defined schedules are not writable through Home Assistant's schedule collection API.
+The interface follows Home Assistant's selected language, with English and German strings and locale-aware weekday names. The card opens Home Assistant's entity settings dialog; use that native form to edit the schedule. Only storage-backed schedules are editable; YAML-defined schedules are not writable through Home Assistant's schedule collection API.

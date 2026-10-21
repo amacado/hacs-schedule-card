@@ -25,8 +25,8 @@ const minutes = (value) => {
 const formatTime = (value) => String(value ?? "").slice(0, 5);
 
 const TEXT = {
-  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", showLegend: "Show legend", entityHeading: "Schedule entities", color: "Color", label: "Label", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
-  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", showLegend: "Legende anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
+  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", openSchedule: "Open settings for {name}", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", showLegend: "Show legend", entityHeading: "Schedule entities", color: "Color", label: "Label", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
+  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", openSchedule: "Einstellungen für {name} öffnen", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", showLegend: "Legende anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", label: "Label", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
 };
 
 const localeFor = (hass) => (hass?.language || navigator.language || "en").split(/[-_]/)[0].toLowerCase();
@@ -57,13 +57,8 @@ class ScheduleCard extends HTMLElement {
     this._items = [];
     this._loading = false;
     this._error = "";
-    this._busy = false;
-    this._drag = null;
     this._subscription = null;
     this._labelObserver = new ResizeObserver(() => this._fitRangeLabels());
-    this._boundPointerMove = (event) => this._onPointerMove(event);
-    this._boundPointerUp = (event) => this._onPointerUp(event);
-    this._boundPointerCancel = () => this._cancelDrag();
   }
 
   connectedCallback() {
@@ -189,19 +184,11 @@ class ScheduleCard extends HTMLElement {
         .card { padding: 16px 20px; border: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); border-radius: var(--bubble-border-radius, 14px); background: var(--bubble-main-background-color, var(--ha-card-background, var(--card-background-color, #252739))); }
         header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); }
         h2 { margin: 0; font-size: 18px; font-weight: 650; }
-        button { display: inline-grid; place-items: center; min-width: 34px; min-height: 34px; padding: 6px; border: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-        button:hover { background: var(--secondary-background-color, rgb(255 255 255 / 7%)); }
-        button.primary { border-color: var(--primary-color, #c99bf2); background: var(--primary-color, #c99bf2); color: var(--text-primary-color, #211d2a); }
-        ha-icon { --mdc-icon-size: 20px; }
-        button.danger { color: var(--error-color, #b3261e); }
-        button:disabled { opacity: .55; cursor: wait; }
-        .toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
         .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 2px 0 12px; }
-        .legend-item { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .legend-item { display: flex; align-items: center; gap: 6px; min-width: 0; cursor: pointer; }
+        .legend-item:focus-visible { outline: 2px solid var(--primary-color, #c99bf2); outline-offset: 3px; }
         .swatch { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--schedule-color); }
         .legend-name { overflow: hidden; max-width: 180px; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-        .legend-actions { display: flex; gap: 3px; margin-left: 2px; }
-        .legend-actions button { min-width: 30px; min-height: 30px; border: 0; }
         .timeline { min-width: 420px; }
         .scroll { overflow-x: auto; }
         .axis, .day-row { display: grid; grid-template-columns: 40px minmax(360px, 1fr); gap: 8px; }
@@ -210,32 +197,15 @@ class ScheduleCard extends HTMLElement {
         .day-row { min-height: 28px; align-items: center; }
         .day-name { color: var(--secondary-text-color, #b8bed8); font-size: 12px; }
         .tracks { display: grid; gap: 3px; }
-        .track { position: relative; height: 19px; border-radius: 4px; background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), var(--bubble-border-color, var(--divider-color, #36394f)) calc(25% - 1px), var(--bubble-border-color, var(--divider-color, #36394f)) 25%); }
+        .track { position: relative; height: 19px; border-radius: 4px; background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), var(--bubble-border-color, var(--divider-color, #36394f)) calc(25% - 1px), var(--bubble-border-color, var(--divider-color, #36394f)) 25%); cursor: pointer; }
+        .track:focus-visible { outline: 2px solid var(--primary-color, #c99bf2); outline-offset: 2px; }
         .range { position: absolute; top: 1px; height: 17px; min-width: 2px; overflow: hidden; padding: 1px 5px; border-radius: 4px; background: var(--schedule-color); color: var(--schedule-text-color, #241e2d); font-size: 11px; line-height: 15px; white-space: nowrap; }
-        .range { cursor: grab; touch-action: none; }
-        .range:active { cursor: grabbing; }
-        .preview { position: absolute; top: 1px; height: 17px; border: 1px dashed var(--schedule-color); border-radius: 4px; background: color-mix(in srgb, var(--schedule-color) 45%, transparent); pointer-events: none; }
+        .range { cursor: pointer; }
         .empty { position: absolute; top: 2px; left: 4px; color: var(--secondary-text-color, #b8bed8); font-size: 10px; }
         .message { padding: 12px 0; color: var(--secondary-text-color, #b8bed8); }
         .error { color: var(--error-color, #b3261e); }
-        .editor { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); }
-        .field-label { display: block; margin: 0 0 5px; color: var(--secondary-text-color, #687270); font-size: 12px; }
-        input { min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); border-radius: 6px; background: var(--input-fill-color, var(--card-background-color, #252739)); color: inherit; font: inherit; }
-        .name-input { width: min(100%, 360px); margin-bottom: 12px; }
-        .edit-day { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 8px; align-items: start; padding: 8px 0; border-top: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); }
-        .edit-day-name { padding-top: 7px; font-size: 12px; font-weight: 600; }
-        .ranges { display: grid; gap: 6px; }
-        .edit-range { display: grid; grid-template-columns: minmax(85px, 120px) minmax(85px, 120px) minmax(90px, 1fr) 34px; gap: 6px; }
-        .range-data { width: 100%; }
-        .remove { min-width: 34px; padding: 4px; }
-        .add-day { margin-top: 6px; font-size: 12px; }
-        .editor-error { margin: 8px 0; color: var(--error-color, #b3261e); font-size: 13px; }
-        .editor-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
         @media (max-width: 520px) {
           .card { padding: 12px; }
-          .edit-range { grid-template-columns: 1fr 1fr 34px; }
-          .range-data { grid-column: 1 / 3; grid-row: 2; }
-          .remove { grid-column: 3; grid-row: 1 / 3; height: 100%; }
         }
       </style>
       <section class="card">
@@ -243,7 +213,8 @@ class ScheduleCard extends HTMLElement {
         ${this._error ? `<div class="message error" role="alert">${escapeHtml(this._error)}</div>` : ""}
         ${message}
       </section>`;
-    this.shadowRoot.onpointerdown = (event) => this._onPointerDown(event);
+    this.shadowRoot.onclick = (event) => this._handleScheduleClick(event);
+    this.shadowRoot.onkeydown = (event) => this._handleScheduleKeydown(event);
     this._fitRangeLabels();
   }
 
@@ -252,7 +223,7 @@ class ScheduleCard extends HTMLElement {
       const entityId = `schedule.${item.id}`;
       const color = escapeHtml(this._colorFor(item, index));
       const label = this._labelFor(item);
-      return `<div class="legend-item" style="--schedule-color:${color}">
+      return `<div class="legend-item" style="--schedule-color:${color}" data-edit-entity="${escapeHtml(entityId)}" role="button" tabindex="0" aria-label="${escapeHtml(localize(this._hass, "openSchedule", { name: this._labelFor(item) }))}" title="${escapeHtml(localize(this._hass, "openSchedule", { name: this._labelFor(item) }))}">
         <span class="swatch"></span><span class="legend-name">${escapeHtml(label)}</span>
       </div>`;
     }).join("")}</div>`;
@@ -275,7 +246,7 @@ class ScheduleCard extends HTMLElement {
             const label = `${formatTime(range.from)}-${formatTime(range.to)}`;
             return `<span class="range" data-entity="${escapeHtml(entityId)}" data-day="${day}" data-index="${rangeIndex}" data-label="${escapeHtml(label)}" aria-label="${escapeHtml(`${entityLabel}, ${label}`)}" style="--schedule-color:${color};left:${left}%;width:${width}%">${escapeHtml(label)}</span>`;
           }).join("");
-          return `<div class="track" data-entity="${escapeHtml(entityId)}" data-day="${day}" style="--schedule-color:${color}">${segments}</div>`;
+          return `<div class="track" data-entity="${escapeHtml(entityId)}" data-day="${day}" style="--schedule-color:${color}" role="button" tabindex="0" aria-label="${escapeHtml(localize(this._hass, "openSchedule", { name: entityLabel }))}" title="${escapeHtml(localize(this._hass, "openSchedule", { name: entityLabel }))}">${segments}</div>`;
         }).join("");
         return `<div class="day-row"><span class="day-name">${escapeHtml(dayLabel(this._hass, dayIndex))}</span><div class="tracks">${tracks}</div></div>`;
       }).join("")}
@@ -298,149 +269,27 @@ class ScheduleCard extends HTMLElement {
     });
   }
 
-  _onPointerDown(event) {
-    if (this._busy || (event.pointerType !== "touch" && event.button !== 0)) return;
-    const rangeElement = event.target.closest(".range");
-    const track = rangeElement?.parentElement || event.target.closest(".track[data-entity]");
-    if (!track) return;
-    const { entity: entityId, day } = track.dataset;
-    const item = this._items.find((schedule) => `schedule.${schedule.id}` === entityId);
-    if (!item) return;
-
-    const trackRect = track.getBoundingClientRect();
-    if (!trackRect.width) return;
-    const minuteAtPointer = this._snapMinute(((event.clientX - trackRect.left) / trackRect.width) * 1440);
-    let action = "create";
-    let rangeIndex = -1;
-    let start = minuteAtPointer;
-    let end = minuteAtPointer;
-
-    if (rangeElement) {
-      rangeIndex = Number(rangeElement.dataset.index);
-      const range = item[day][rangeIndex];
-      start = minutes(range.from);
-      end = minutes(range.to);
-      const rect = rangeElement.getBoundingClientRect();
-      const offset = event.clientX - rect.left;
-      const edgeSize = Math.min(8, rect.width / 4);
-      action = offset < edgeSize ? "resize-start" : offset > rect.width - edgeSize ? "resize-end" : "move";
+  _handleScheduleClick(event) {
+    const target = event.target.closest("[data-edit-entity]") || event.target.closest(".track[data-entity]");
+    if (target?.dataset.editEntity || target?.dataset.entity) {
+      this._openScheduleSettings(target.dataset.editEntity || target.dataset.entity);
     }
+  }
 
-    this._drag = { entityId, day, action, rangeIndex, start, end, anchor: minuteAtPointer, track, trackRect, rangeElement, pointerId: event.pointerId, moved: false };
-    window.addEventListener("pointermove", this._boundPointerMove, true);
-    window.addEventListener("pointerup", this._boundPointerUp, true);
-    window.addEventListener("pointercancel", this._boundPointerCancel, true);
+  _handleScheduleKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target.closest("[data-edit-entity], .track[data-entity]");
+    if (!target) return;
     event.preventDefault();
+    this._openScheduleSettings(target.dataset.editEntity);
   }
 
-  _snapMinute(value) {
-    return Math.max(0, Math.min(1440, Math.round(value / 15) * 15));
-  }
-
-  _onPointerMove(event) {
-    const drag = this._drag;
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const pointer = this._snapMinute(((event.clientX - drag.trackRect.left) / drag.trackRect.width) * 1440);
-    drag.moved ||= Math.abs(pointer - drag.anchor) >= 3;
-    if (!drag.moved) return;
-    let start = drag.start;
-    let end = drag.end;
-
-    if (drag.action === "create") {
-      start = Math.min(drag.anchor, pointer);
-      end = Math.max(drag.anchor, pointer);
-      if (end - start < 15) end = Math.min(1440, start + 15);
-    } else if (drag.action === "move") {
-      const delta = pointer - drag.anchor;
-      const duration = drag.end - drag.start;
-      start = Math.max(0, Math.min(1440 - duration, drag.start + delta));
-      end = start + duration;
-    } else if (drag.action === "resize-start") {
-      start = Math.max(0, Math.min(drag.end - 15, pointer));
-    } else if (drag.action === "resize-end") {
-      end = Math.max(drag.start + 15, Math.min(1440, pointer));
-    }
-
-    drag.preview = { start, end };
-    if (drag.rangeElement) {
-      drag.rangeElement.style.left = `${(start / 1440) * 100}%`;
-      drag.rangeElement.style.width = `${((end - start) / 1440) * 100}%`;
-    } else {
-      if (!drag.previewElement) {
-        drag.previewElement = document.createElement("span");
-        drag.previewElement.className = "preview";
-        drag.track.append(drag.previewElement);
-      }
-      drag.previewElement.style.left = `${(start / 1440) * 100}%`;
-      drag.previewElement.style.width = `${((end - start) / 1440) * 100}%`;
-    }
-  }
-
-  async _onPointerUp(event) {
-    const drag = this._drag;
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    this._drag = null;
-    this._removePointerListeners();
-    if (!drag.moved) return;
-    const item = this._items.find((schedule) => `schedule.${schedule.id}` === drag.entityId);
-    if (!item) return this._render();
-
-    let start = drag.preview?.start ?? drag.start;
-    let end = drag.preview?.end ?? drag.end;
-    if (drag.action === "create" && end - start < 15) {
-      start = Math.min(1380, start);
-      end = Math.min(1440, start + 60);
-    }
-    const ranges = [...(item[drag.day] || [])].map((range) => ({ ...range }));
-    const timeRange = { from: this._timeValue(start), to: this._timeValue(end) };
-    if (drag.action === "create") ranges.push(timeRange);
-    else ranges[drag.rangeIndex] = { ...ranges[drag.rangeIndex], ...timeRange };
-    ranges.sort((first, second) => first.from.localeCompare(second.from));
-    await this._saveRange(item, drag.day, ranges);
-  }
-
-  _timeValue(value) {
-    if (value >= 1440) return "24:00:00";
-    const hours = Math.floor(value / 60).toString().padStart(2, "0");
-    const minutesValue = (value % 60).toString().padStart(2, "0");
-    return `${hours}:${minutesValue}:00`;
-  }
-
-  _cancelDrag() {
-    if (!this._drag) return;
-    this._drag = null;
-    this._removePointerListeners();
-    this._render();
-  }
-
-  _removePointerListeners() {
-    window.removeEventListener("pointermove", this._boundPointerMove, true);
-    window.removeEventListener("pointerup", this._boundPointerUp, true);
-    window.removeEventListener("pointercancel", this._boundPointerCancel, true);
-  }
-
-  async _saveRange(item, day, ranges) {
-    const payload = { name: item.name, ...(item.icon ? { icon: item.icon } : {}) };
-    for (const [weekday] of DAYS) {
-      payload[weekday] = weekday === day ? ranges : (item[weekday] || []).map((range) => ({ ...range }));
-    }
-    this._busy = true;
-    this._error = "";
-    this._render();
-    try {
-      const saved = await this._hass.callWS({
-        type: "schedule/update",
-        schedule_id: item.id,
-        ...payload,
-      });
-      const index = this._items.findIndex((schedule) => schedule.id === item.id);
-      if (index !== -1) this._items[index] = saved;
-    } catch (error) {
-      this._error = error.message || localize(this._hass, "saveError");
-    } finally {
-      this._busy = false;
-      this._render();
-    }
+  _openScheduleSettings(entityId) {
+    this.dispatchEvent(new CustomEvent("hass-more-info", {
+      detail: { entityId, view: "settings" },
+      bubbles: true,
+      composed: true,
+    }));
   }
 
 }
