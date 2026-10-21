@@ -15,7 +15,7 @@ Alternatively, copy `schedule-card.js` into `config/www/`, then add it as a Java
 
 ## Configuration
 
-Use the Lovelace visual editor's multi-select entity dropdown to choose schedules and set a label and color for each schedule. Labels are display-only; an empty label uses the schedule's Home Assistant name. Choose a whole-week or single-day view, and show or hide the header and legend. Without an entity selection, all stored schedules are displayed. Click a schedule's timeline lane or legend entry to open Home Assistant's native settings mask for that specific schedule. When several schedules are shown, each lane and legend entry opens its own schedule.
+Use the Lovelace visual editor's multi-select entity dropdown to choose schedules and set a label and color for each schedule. Labels are display-only; an empty label uses the schedule's Home Assistant name. Choose a whole-week or single-day view, and show or hide the header and legend. Without an entity selection, all stored schedules are displayed. When several schedules are shown, use the in-card schedule selector to choose which one to edit. Click an empty lane to create a one-hour range, drag across a lane to choose its duration, drag a bar to move it, or drag either edge to resize it. Changes save automatically.
 
 The equivalent YAML options are:
 
@@ -35,4 +35,4 @@ show_header: true
 show_legend: true
 ```
 
-The interface follows Home Assistant's selected language, with English and German strings and locale-aware weekday names. The card opens Home Assistant's entity settings dialog; use that native form to edit the schedule. Only storage-backed schedules are editable; YAML-defined schedules are not writable through Home Assistant's schedule collection API.
+The interface follows Home Assistant's selected language, with English and German strings and locale-aware weekday names. Time edits are snapped to 15-minute increments and validated by Home Assistant. Only storage-backed schedules are editable; YAML-defined schedules are not writable through Home Assistant's schedule collection API.
