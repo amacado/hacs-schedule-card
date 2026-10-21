@@ -25,8 +25,8 @@ const minutes = (value) => {
 const formatTime = (value) => String(value ?? "").slice(0, 5);
 
 const TEXT = {
-  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", selectSchedule: "Select {name} to edit", editingSchedule: "Editing schedule", openSchedule: "Open settings for {name}", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", showLegend: "Show legend", entityHeading: "Schedule entities", color: "Color", label: "Label", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
-  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", selectSchedule: "{name} zum Bearbeiten auswählen", editingSchedule: "Zeitplan bearbeiten", openSchedule: "Einstellungen für {name} öffnen", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", showLegend: "Legende anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", label: "Label", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
+  en: { title: "Schedules", add: "Add schedule", edit: "Edit", delete: "Delete", cancel: "Cancel", save: "Save", loading: "Loading schedules...", empty: "No stored schedules yet.", noTimes: "No times", choose: "Choose schedules in the card settings.", missing: "Selected schedules are not available.", confirm: 'Delete schedule "{name}"?', nameRequired: "Enter a name for this schedule.", timeRequired: "Each time range needs a start and end.", jsonInvalid: "Action data must be valid JSON.", jsonObject: "Action data must be a JSON object.", saveError: "Unable to save schedule.", deleteError: "Unable to delete schedule.", toggleError: "Unable to change the schedule state.", restartRequired: "Home Assistant must restart to enable this schedule entity.", pause: "Disable schedule", resume: "Enable schedule", selectSchedule: "Select {name} to edit", editingSchedule: "Editing schedule", openSchedule: "Open settings for {name}", removeRange: "Remove time range", enableEditing: "Enable editing", view: "Display", week: "Whole week", day: "Single day", whichDay: "Day", today: "Today", titleLabel: "Title", showHeader: "Show header", showLegend: "Show legend", entityHeading: "Schedule entities", color: "Color", label: "Label", dragHelp: "Drag on a track to create a time. Drag a bar to move it; drag either edge to resize it.", noEntities: "No editable schedule entities found." },
+  de: { title: "Zeitpläne", add: "Zeitplan hinzufügen", edit: "Bearbeiten", delete: "Löschen", cancel: "Abbrechen", save: "Speichern", loading: "Zeitpläne werden geladen...", empty: "Keine gespeicherten Zeitpläne.", noTimes: "Keine Zeiten", choose: "Wähle Zeitpläne in den Karteneinstellungen.", missing: "Ausgewählte Zeitpläne sind nicht verfügbar.", confirm: 'Zeitplan "{name}" löschen?', nameRequired: "Gib einen Namen für diesen Zeitplan ein.", timeRequired: "Jeder Zeitraum benötigt einen Start und ein Ende.", jsonInvalid: "Die Aktionsdaten müssen gültiges JSON sein.", jsonObject: "Die Aktionsdaten müssen ein JSON-Objekt sein.", saveError: "Zeitplan konnte nicht gespeichert werden.", deleteError: "Zeitplan konnte nicht gelöscht werden.", toggleError: "Der Zeitplanstatus konnte nicht geändert werden.", restartRequired: "Home Assistant muss neu gestartet werden, um diesen Zeitplan zu aktivieren.", pause: "Zeitplan deaktivieren", resume: "Zeitplan aktivieren", selectSchedule: "{name} zum Bearbeiten auswählen", editingSchedule: "Zeitplan bearbeiten", openSchedule: "Einstellungen für {name} öffnen", removeRange: "Zeitraum entfernen", enableEditing: "Bearbeitung aktivieren", view: "Anzeige", week: "Ganze Woche", day: "Einzelner Tag", whichDay: "Wochentag", today: "Heute", titleLabel: "Titel", showHeader: "Kopfzeile anzeigen", showLegend: "Legende anzeigen", entityHeading: "Zeitplan-Entitäten", color: "Farbe", label: "Label", dragHelp: "Auf einer Zeile ziehen, um eine Zeit zu erstellen. Balken verschieben oder an den Enden ziehen, um sie anzupassen.", noEntities: "Keine bearbeitbaren Zeitplan-Entitäten gefunden." },
 };
 
 const localeFor = (hass) => (hass?.language || navigator.language || "en").split(/[-_]/)[0].toLowerCase();
@@ -48,7 +48,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], view: "week", day: "today", show_header: true, show_legend: true };
+    return { entities: [], view: "week", day: "today", show_header: true, show_legend: true, edit_enabled: true };
   }
 
   constructor() {
@@ -62,6 +62,8 @@ class ScheduleCard extends HTMLElement {
     this._drag = null;
     this._busy = false;
     this._subscription = null;
+    this._measureCanvas = document.createElement("canvas");
+    this._measureContext = this._measureCanvas.getContext("2d");
     this._labelObserver = new ResizeObserver(() => this._fitRangeLabels());
     this.shadowRoot.addEventListener("pointerdown", (event) => this._onEditStart(event));
     this.shadowRoot.addEventListener("click", (event) => this._handleScheduleClick(event));
@@ -89,6 +91,7 @@ class ScheduleCard extends HTMLElement {
       day: "today",
       show_header: true,
       show_legend: true,
+      edit_enabled: config.edit_enabled !== undefined ? config.edit_enabled : true,
       ...config,
       entities: config.entities || (config.entity ? [config.entity] : []),
     };
@@ -96,9 +99,10 @@ class ScheduleCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const localeChanged = this._hass?.language !== hass?.language;
     this._hass = hass;
     if (!this._loaded && !this._loading) this._load();
-    else this._render();
+    else if (localeChanged) this._render();
   }
 
   getCardSize() {
@@ -190,7 +194,7 @@ class ScheduleCard extends HTMLElement {
       : missing
           ? `<div class="message">${escapeHtml(localize(this._hass, "missing"))}</div>`
           : items.length
-            ? `${items.length > 1 ? this._renderEditTarget(items) : ""}${this._renderTimeline(items)}${this._config.show_legend ? this._renderLegend(items) : ""}`
+            ? `${this._config.edit_enabled && items.length > 1 ? this._renderEditTarget(items) : ""}${this._renderSelectedRangeTools()}${this._renderTimeline(items)}${this._config.show_legend ? this._renderLegend(items) : ""}`
             : `<div class="message">${escapeHtml(this._config.entities?.length ? localize(this._hass, "missing") : localize(this._hass, "empty"))}</div>`;
 
     this.shadowRoot.innerHTML = `
@@ -206,6 +210,9 @@ class ScheduleCard extends HTMLElement {
         .legend-item:focus-visible { outline: 2px solid var(--primary-color, #c99bf2); outline-offset: 3px; }
         .edit-target { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 0 0 10px; font-size: 12px; }
         .edit-target select { max-width: 240px; min-height: 34px; padding: 4px 8px; border: 1px solid var(--bubble-border-color, var(--divider-color, #36394f)); border-radius: 7px; background: var(--card-background-color, #252739); color: inherit; font: inherit; }
+        .selection-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 36px; margin: 0 0 8px; color: var(--secondary-text-color, #b8bed8); font-size: 12px; }
+        .selection-tools ha-icon-button { --mdc-icon-button-size: 34px; color: var(--error-color, #ef7888); }
+        .selection-tools ha-icon { --mdc-icon-size: 20px; }
         .swatch { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--schedule-color); }
         .legend-name { overflow: hidden; max-width: 180px; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
         .timeline { min-width: 420px; }
@@ -228,6 +235,7 @@ class ScheduleCard extends HTMLElement {
         .preview { z-index: 3; border: 1px dashed var(--schedule-color); background: color-mix(in srgb, var(--schedule-color) 55%, transparent); pointer-events: none; }
         .track.inactive { opacity: .58; }
         .track.active { opacity: 1; }
+        .readonly .track, .readonly .range { cursor: default; }
         .empty { position: absolute; top: 2px; left: 4px; color: var(--secondary-text-color, #b8bed8); font-size: 10px; }
         .message { padding: 12px 0; color: var(--secondary-text-color, #b8bed8); }
         .error { color: var(--error-color, #b3261e); }
@@ -235,7 +243,7 @@ class ScheduleCard extends HTMLElement {
           .card { padding: 12px; }
         }
       </style>
-      <section class="card">
+      <section class="card ${this._config.edit_enabled ? "editable" : "readonly"}">
         ${this._config.show_header ? `<header><h2>${title}</h2></header>` : ""}
         ${this._error ? `<div class="message error" role="alert">${escapeHtml(this._error)}</div>` : ""}
         ${message}
@@ -256,6 +264,20 @@ class ScheduleCard extends HTMLElement {
 
   _renderEditTarget(items) {
     return `<label class="edit-target"><span>${escapeHtml(localize(this._hass, "editingSchedule"))}</span><select data-edit-target>${items.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === this._activeScheduleId ? "selected" : ""}>${escapeHtml(this._labelFor(item))}</option>`).join("")}</select></label>`;
+  }
+
+  _renderSelectedRangeTools() {
+    const selected = this._selectedRange;
+    if (!this._config.edit_enabled || !selected) return "";
+    const item = this._items.find((schedule) => schedule.id === selected.id);
+    const dayIndex = DAYS.findIndex(([day]) => day === selected.day);
+    if (!item || dayIndex < 0) return "";
+    const ranges = [...(item[selected.day] || [])].sort((first, second) => first.from.localeCompare(second.from));
+    const range = ranges[selected.index];
+    if (!range) return "";
+    const description = `${this._labelFor(item)}, ${dayLabel(this._hass, dayIndex)}, ${formatTime(range.from)}-${formatTime(range.to)}`;
+    const removeLabel = localize(this._hass, "removeRange");
+    return `<div class="selection-tools"><span>${escapeHtml(description)}</span><ha-icon-button data-remove-range aria-label="${escapeHtml(removeLabel)}: ${escapeHtml(description)}" title="${escapeHtml(removeLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></ha-icon-button></div>`;
   }
 
   _renderTimeline(items) {
@@ -285,8 +307,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   _fitRangeLabels() {
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
+    const context = this._measureContext;
     this.shadowRoot?.querySelectorAll(".range[data-label]").forEach((range) => {
       const label = range.dataset.label;
       const style = window.getComputedStyle(range);
@@ -307,12 +328,17 @@ class ScheduleCard extends HTMLElement {
       return;
     }
     if (event.target.closest("select")) return;
+    if (event.target.closest("[data-remove-range]")) {
+      this._removeSelectedRange();
+      return;
+    }
     const legendEntry = event.target.closest("[data-edit-entity]");
     if (legendEntry) {
       this._setActiveSchedule(legendEntry.dataset.editEntity);
       return;
     }
     if (event.target.closest("[data-edit-target]")) return;
+    if (!this._config.edit_enabled) return;
     const range = event.target.closest(".range[data-entity]");
     if (range) {
       const scheduleId = range.dataset.entity.slice("schedule.".length);
@@ -345,6 +371,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   async _handleScheduleKeydown(event) {
+    if (!this._config.edit_enabled) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     const range = event.target.closest(".range[data-entity]");
     if (range) {
@@ -391,7 +418,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   _onEditStart(event) {
-    if (this._busy || event.button !== 0) return;
+    if (!this._config.edit_enabled || this._busy || event.button !== 0) return;
     const rangeElement = event.target.closest(".range[data-entity]");
     const track = rangeElement?.parentElement || event.target.closest(".track[data-entity]");
     if (!track) return;
@@ -552,6 +579,7 @@ class ScheduleCard extends HTMLElement {
   }
 
   async _saveSchedule(item, day, ranges) {
+    if (!this._config.edit_enabled || this._busy) return false;
     const payload = { name: item.name, ...(item.icon ? { icon: item.icon } : {}) };
     for (const [weekday] of DAYS) {
       payload[weekday] = weekday === day ? ranges : (item[weekday] || []).map((range) => ({ ...range }));
@@ -563,12 +591,27 @@ class ScheduleCard extends HTMLElement {
       const saved = await this._hass.callWS({ type: "schedule/update", schedule_id: item.id, ...payload });
       const index = this._items.findIndex((schedule) => schedule.id === item.id);
       if (index !== -1) this._items[index] = saved;
+      return true;
     } catch (error) {
       this._error = error.message || localize(this._hass, "saveError");
+      return false;
     } finally {
       this._busy = false;
       this._render();
     }
+  }
+
+  async _removeSelectedRange() {
+    if (!this._config.edit_enabled || this._busy || !this._selectedRange) return;
+    const { id, day, index } = this._selectedRange;
+    const item = this._items.find((schedule) => schedule.id === id);
+    if (!item) return;
+    const ranges = [...(item[day] || [])].sort((first, second) => first.from.localeCompare(second.from));
+    if (index < 0 || index >= ranges.length) return;
+    ranges.splice(index, 1);
+    const removed = await this._saveSchedule(item, day, ranges);
+    if (removed) this._selectedRange = null;
+    this._render();
   }
 
 }
@@ -585,6 +628,7 @@ class ScheduleCardEditor extends HTMLElement {
       day: "today",
       show_header: true,
       show_legend: true,
+      edit_enabled: config.edit_enabled !== undefined ? config.edit_enabled : true,
       ...config,
       entities: config.entities || (config.entity ? [config.entity] : []),
     };
@@ -659,6 +703,7 @@ class ScheduleCardEditor extends HTMLElement {
         ${this._config.view === "day" ? `<label class="field"><span class="label">${escapeHtml(localize(locale, "whichDay"))}</span><select data-option="day">${dayOptions}</select></label>` : ""}
         <label class="toggle"><ha-switch data-option="show_header" ${this._config.show_header ? "checked" : ""}></ha-switch>${escapeHtml(localize(locale, "showHeader"))}</label>
         <label class="toggle"><ha-switch data-option="show_legend" ${this._config.show_legend ? "checked" : ""}></ha-switch>${escapeHtml(localize(locale, "showLegend"))}</label>
+        <label class="toggle"><ha-switch data-option="edit_enabled" ${this._config.edit_enabled ? "checked" : ""}></ha-switch>${escapeHtml(localize(locale, "enableEditing"))}</label>
       </div>`;
 
     const selector = document.createElement("ha-selector");
